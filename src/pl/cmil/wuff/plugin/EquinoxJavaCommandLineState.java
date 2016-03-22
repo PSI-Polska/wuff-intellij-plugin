@@ -197,7 +197,8 @@ public class EquinoxJavaCommandLineState extends JavaCommandLineState {
     }
 
     private String getModuleBuildPath(Module module) {
-        return ModuleRootManager.getInstance(module).getContentRoots()[0].getCanonicalPath() + File.separator + "build";
+        return ModuleRootManager.getInstance(module).getContentRoots()[0].getCanonicalPath()
+            .replace( "/src/main", "" ) + File.separator + "build";
     }
 
 }
