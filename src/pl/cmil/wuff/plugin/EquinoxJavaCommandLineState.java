@@ -32,9 +32,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
 
-public class EquinoxJavaCommandLineState extends JavaCommandLineState
-{
-    private final static Logger log = Logger.getInstance( EquinoxJavaCommandLineState.class );
+public class EquinoxJavaCommandLineState extends JavaCommandLineState {
+    private final static Logger log = Logger.getInstance(EquinoxJavaCommandLineState.class);
     private final Module appModule;
     private final PersistentConfigurationValues configurationValues;
     private final String mainClass;
@@ -44,11 +43,9 @@ public class EquinoxJavaCommandLineState extends JavaCommandLineState
     private final ExecutionEnvironment environment;
     private final Executor executor;
 
-    protected EquinoxJavaCommandLineState( Module appModule,
-        PersistentConfigurationValues configurationValues, ExecutionEnvironment environment,
-        Executor executor )
-    {
-        super( environment );
+    protected EquinoxJavaCommandLineState(Module appModule, PersistentConfigurationValues configurationValues,
+                                          ExecutionEnvironment environment, Executor executor) {
+        super(environment);
         this.appModule = appModule;
         this.configurationValues = configurationValues;
         this.mainClass = configurationValues.getMainClass();
@@ -61,186 +58,146 @@ public class EquinoxJavaCommandLineState extends JavaCommandLineState
 
     @NotNull
     @Override
-    protected OSProcessHandler startProcess() throws ExecutionException
-    {
+    protected OSProcessHandler startProcess() throws ExecutionException {
         validateIfProjectIsPrebuilt();
 
         final OSProcessHandler osProcessHandler = super.startProcess();
-        osProcessHandler
-            .addProcessListener( new EquinoxRestartProcessListener( appModule, environment, executor ) );
+        osProcessHandler.addProcessListener(new EquinoxRestartProcessListener(appModule, environment, executor));
 
-        if( configurationValues.isAutoDiagnostic() )
-        {
-            osProcessHandler
-                .addProcessListener( new EquinoxDiagnosisProcessListener( appModule, configurationValues ) );
+        if (configurationValues.isAutoDiagnostic()) {
+            osProcessHandler.addProcessListener(new EquinoxDiagnosisProcessListener(appModule, configurationValues));
         }
 
         return osProcessHandler;
     }
 
-    private void validateIfProjectIsPrebuilt() throws ExecutionException
-    {
-        File workingDirectory = new File( getJavaParameters().getWorkingDirectory() );
-        if( !workingDirectory.exists() )
-        {
-            throw new ExecutionException( getNotPrebuiltMessage() );
+    private void validateIfProjectIsPrebuilt() throws ExecutionException {
+        File workingDirectory = new File(getJavaParameters().getWorkingDirectory());
+        if (!workingDirectory.exists()) {
+            throw new ExecutionException(getNotPrebuiltMessage());
         }
     }
 
-    private String getNotPrebuiltMessage()
-    {
-        return WuffBundle.message( "wuff.runtime.notprebuilt",
-            appModule.getOptionValue( ExternalSystemConstants.EXTERNAL_SYSTEM_MODULE_GROUP_KEY ) );
+    private String getNotPrebuiltMessage() {
+        return WuffBundle.message("wuff.runtime.notprebuilt", appModule.getOptionValue(ExternalSystemConstants.EXTERNAL_SYSTEM_MODULE_GROUP_KEY));
     }
 
     @Override
-    protected JavaParameters createJavaParameters() throws ExecutionException
-    {
+    protected JavaParameters createJavaParameters() throws ExecutionException {
         JavaParameters params = new JavaParameters();
 
-        setupLaunchConfiguration( params, getEnvironment() );
+        setupLaunchConfiguration(params, getEnvironment());
 
-        fillProgramParameters( params );
-        setupClassPath( params );
+        fillProgramParameters(params);
+        setupClassPath(params);
 
         rebuildJars();
 
         return params;
     }
 
-    private void setupLaunchConfiguration( JavaParameters params, ExecutionEnvironment executionEnvironment )
-    {
-        params.setJdk( ProjectRootManager.getInstance( executionEnvironment.getProject() ).getProjectSdk() );
-        params.setWorkingDirectory( getModuleBuildPath( appModule ) + File.separator + "run" );
-        params.getVMParametersList().addParametersString( vmArgs );
+    private void setupLaunchConfiguration(JavaParameters params, ExecutionEnvironment executionEnvironment) {
+        params.setJdk(ProjectRootManager.getInstance(executionEnvironment.getProject()).getProjectSdk());
+        params.setWorkingDirectory(getModuleBuildPath(appModule) + File.separator + "run");
+        params.getVMParametersList().addParametersString(vmArgs);
 
-        params.setMainClass( mainClass );
+        params.setMainClass(mainClass);
     }
 
-    private void fillProgramParameters( JavaParameters params )
-    {
+    private void fillProgramParameters(JavaParameters params) {
         ParametersList programParametersList = params.getProgramParametersList();
-        for( EquinoxConfigurationOptions configurationValue : enabledConfigs )
-        {
-            programParametersList.add( configurationValue.getParameter() );
+        for (EquinoxConfigurationOptions configurationValue : enabledConfigs) {
+            programParametersList.add(configurationValue.getParameter());
         }
 
-        programParametersList.add( "-application", applicationName );
-        programParametersList.add( "-configuration", "configuration" );
-        programParametersList.add( "%*" );
+        programParametersList.add("-application", applicationName);
+        programParametersList.add("-configuration", "configuration");
+        programParametersList.add("%*");
     }
 
-    private void setupClassPath( JavaParameters params )
-    {
-        for( VirtualFile lib : ModuleRootManager.getInstance( appModule ).orderEntries().classes()
-            .getRoots() )
-        {
-            params.getClassPath().add( lib );
+    private void setupClassPath(JavaParameters params) {
+        for (VirtualFile lib : ModuleRootManager.getInstance(appModule).orderEntries().classes().getRoots()) {
+            params.getClassPath().add(lib);
         }
     }
 
-    private void rebuildJars() throws ExecutionException
-    {
+    private void rebuildJars() throws ExecutionException {
         Set<Module> modulesToRebuild = new HashSet<>();
-        ModuleUtilCore.getDependencies( appModule, modulesToRebuild );
+        ModuleUtilCore.getDependencies(appModule, modulesToRebuild);
 
-        log.info( "Rebuilding modules: " + modulesToRebuild );
+        log.info("Rebuilding modules: " + modulesToRebuild);
 
-        for( Module module : modulesToRebuild )
-        {
-            rebuildModuleJar( module );
+        for (Module module : modulesToRebuild) {
+            rebuildModuleJar(module);
         }
 
-        if( modulesToRebuild.stream().anyMatch( this::isGradleConfigurationNotClear ) )
-        {
+        if (modulesToRebuild.stream().anyMatch(this::isGradleConfigurationNotClear)) {
             warnUserAboutBuildAmbiguity();
         }
 
     }
 
-    private void rebuildModuleJar( Module module ) throws ExecutionException
-    {
-        String moduleBuildPath = getModuleBuildPath( module );
-        File manifestFile = new File(
-            moduleBuildPath + File.separator + "tmp" + File.separator + "jar" + File.separator
-                + "MANIFEST.MF" );
+    private void rebuildModuleJar(Module module) throws ExecutionException {
+        String moduleBuildPath = getModuleBuildPath(module);
+        File manifestFile = new File(moduleBuildPath + File.separator + "tmp" + File.separator + "jar" + File.separator + "MANIFEST.MF");
 
-        if( isProjectPrebuiltByGradle( manifestFile ) )
-        {
+        if (isProjectPrebuiltByGradle(manifestFile)) {
             Jar moduleJar = new Jar();
-            moduleJar
-                .setDuplicate( (Zip.Duplicate)Zip.Duplicate.getInstance( Zip.Duplicate.class, "preserve" ) );
-            moduleJar.setProject( new org.apache.tools.ant.Project() );
-            moduleJar.setManifest( manifestFile );
+            moduleJar.setDuplicate((Zip.Duplicate) Zip.Duplicate.getInstance(Zip.Duplicate.class, "preserve"));
+            moduleJar.setProject(new org.apache.tools.ant.Project());
+            moduleJar.setManifest(manifestFile);
 
-            File classDir = new File(
-                moduleBuildPath + File.separator + "classes" + File.separator + "main" + File.separator );
-            addDirectoryToJar( moduleJar, classDir );
+            File classDir = new File(moduleBuildPath + File.separator + "classes" + File.separator + "main" + File.separator);
+            addDirectoryToJar(moduleJar, classDir);
 
-            File resourceDirectory = new File(
-                moduleBuildPath + File.separator + "resources" + File.separator + "main" + File.separator );
-            if( resourceDirectory.exists() )
-            {
-                addDirectoryToJar( moduleJar, resourceDirectory );
+            File resourceDirectory = new File(moduleBuildPath + File.separator + "resources" + File.separator + "main" + File.separator);
+            if (resourceDirectory.exists()) {
+                addDirectoryToJar(moduleJar, resourceDirectory);
             }
 
-            File output =
-                new File( moduleBuildPath + File.separator + "libs" + File.separator + getJarName( module ) );
-            moduleJar.setDestFile( output );
+            File output = new File(moduleBuildPath + File.separator + "libs" + File.separator + getJarName(module));
+            moduleJar.setDestFile(output);
 
             moduleJar.execute();
-        }
-        else
-        {
-            throw new ExecutionException( getNotPrebuiltMessage() );
+        } else {
+            throw new ExecutionException(getNotPrebuiltMessage());
         }
 
     }
 
-    private void warnUserAboutBuildAmbiguity()
-    {
-        Notification buildCheckNotification = new Notification( "wuff.build.warning", "Wuff build warning",
-            WuffBundle.message( "wuff.build.warning.uncertain.configuration" ), NotificationType.WARNING )
-            .setImportant( true );
-        Notifications.Bus.notify( buildCheckNotification );
+    private void warnUserAboutBuildAmbiguity() {
+        Notification buildCheckNotification = new Notification("wuff.build.warning", "Wuff build warning",
+                WuffBundle.message("wuff.build.warning.uncertain.configuration"), NotificationType.WARNING)
+                .setImportant(true);
+        Notifications.Bus.notify(buildCheckNotification);
     }
 
-    private boolean isGradleConfigurationNotClear( Module module )
-    {
-        try (Stream<Path> paths = Files
-            .walk( Paths.get( getModuleBuildPath( module ) + File.separator + "libs" ) ))
-        {
-            return paths.filter( f -> f.getFileName().toString().endsWith( ".jar" ) ).count() > 1;
-        }
-        catch( Exception e )
-        {
-            log.warn( "Cannot check gradle configuration. The build will continue ", e );
+    private boolean isGradleConfigurationNotClear(Module module) {
+        try (Stream<Path> paths = Files.walk(Paths.get(getModuleBuildPath(module) + File.separator + "libs"))) {
+            return paths.filter(f -> f.getFileName().toString().endsWith(".jar")).count() > 1;
+        } catch (Exception e) {
+            log.warn("Cannot check gradle configuration. The build will continue ", e);
         }
 
         return false;
     }
 
-    private void addDirectoryToJar( Jar moduleJar, File dir )
-    {
+    private void addDirectoryToJar(Jar moduleJar, File dir) {
         FileSet fileSet = new FileSet();
-        fileSet.setDir( dir );
-        moduleJar.addFileset( fileSet );
+        fileSet.setDir(dir);
+        moduleJar.addFileset(fileSet);
     }
 
-    private boolean isProjectPrebuiltByGradle( File manifestFile )
-    {
+    private boolean isProjectPrebuiltByGradle(File manifestFile) {
         return manifestFile.exists();
     }
 
-    private String getJarName( Module myModule )
-    {
-        return myModule.getName().replaceAll( "_main$", "" ) + "_" + myModule
-            .getOptionValue( ExternalSystemConstants.EXTERNAL_SYSTEM_MODULE_VERSION_KEY ) + ".jar";
+    private String getJarName(Module myModule) {
+        return myModule.getName() + "_" + myModule.getOptionValue(ExternalSystemConstants.EXTERNAL_SYSTEM_MODULE_VERSION_KEY) + ".jar";
     }
 
-    private String getModuleBuildPath( Module module )
-    {
-        return ModuleRootManager.getInstance( module ).getContentRoots()[ 0 ].getCanonicalPath()
+    private String getModuleBuildPath(Module module) {
+        return ModuleRootManager.getInstance(module).getContentRoots()[0].getCanonicalPath()
             .replace( "/src/main", "" ) + File.separator + "build";
     }
 
