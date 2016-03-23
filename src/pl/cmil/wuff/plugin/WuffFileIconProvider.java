@@ -11,7 +11,7 @@ public class WuffFileIconProvider implements FileIconProvider {
     @Nullable
     @Override
     public Icon getIcon(VirtualFile virtualFile, int flag, Project project) {
-        if (virtualFile.getExtension().equals("e4xmi")) {
+        if (virtualFile.getExtension()!= null && virtualFile.getExtension().equals("e4xmi")) {
             return WuffIcons.E4XMI_SMALL;
         }
         return null;
