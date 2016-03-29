@@ -130,10 +130,10 @@ public class EquinoxJavaCommandLineState extends JavaCommandLineState {
         for (Module module : modulesToRebuild) {
             rebuildModuleJar(module);
         }
-
-        if (modulesToRebuild.stream().anyMatch(this::isGradleConfigurationNotClear)) {
-            warnUserAboutBuildAmbiguity();
-        }
+//
+//        if (modulesToRebuild.stream().anyMatch(this::isGradleConfigurationNotClear)) {
+//            warnUserAboutBuildAmbiguity();
+//        }
 
     }
 
