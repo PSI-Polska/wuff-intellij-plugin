@@ -13,10 +13,17 @@ import com.intellij.notification.Notifications;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.externalSystem.util.ExternalSystemConstants;
 import com.intellij.openapi.module.Module;
+import com.intellij.openapi.module.ModuleUtil;
 import com.intellij.openapi.module.ModuleUtilCore;
+import com.intellij.openapi.module.impl.scopes.ModuleWithDependenciesScope;
 import com.intellij.openapi.roots.ModuleRootManager;
+import com.intellij.openapi.roots.ModuleRootModel;
+import com.intellij.openapi.roots.ModuleRootModificationUtil;
 import com.intellij.openapi.roots.ProjectRootManager;
+import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.newvfs.impl.VirtualFileImpl;
+import org.apache.tools.ant.Project;
 import org.apache.tools.ant.taskdefs.Jar;
 import org.apache.tools.ant.taskdefs.Zip;
 import org.apache.tools.ant.types.FileSet;
@@ -27,6 +34,7 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -119,6 +127,12 @@ public class EquinoxJavaCommandLineState extends JavaCommandLineState {
         for (VirtualFile lib : ModuleRootManager.getInstance(appModule).orderEntries().classes().getRoots()) {
             params.getClassPath().add(lib);
         }
+        Arrays.stream(ModuleRootManager.getInstance(appModule).getDependencies()).
+                filter(m -> m.getName().equals("pl.psi.jls.launcher_main")).
+                findAny().ifPresent(module1 -> params
+                .getClassPath()
+                .addVirtualFiles(((ModuleWithDependenciesScope) module1.getModuleWithDependenciesAndLibrariesScope(false)).getRoots()));
+
     }
 
     private void rebuildJars() throws ExecutionException {
@@ -193,12 +207,12 @@ public class EquinoxJavaCommandLineState extends JavaCommandLineState {
     }
 
     private String getJarName(Module myModule) {
-        return myModule.getName().replaceAll( "_main$", "" ) + "_" + myModule.getOptionValue(ExternalSystemConstants.EXTERNAL_SYSTEM_MODULE_VERSION_KEY) + ".jar";
+        return myModule.getName().replaceAll("_main$", "") + "_" + myModule.getOptionValue(ExternalSystemConstants.EXTERNAL_SYSTEM_MODULE_VERSION_KEY) + ".jar";
     }
 
     private String getModuleBuildPath(Module module) {
         return ModuleRootManager.getInstance(module).getContentRoots()[0].getCanonicalPath()
-            .replace( "/src/main", "" ) + File.separator + "build";
+                .replace("/src/main", "") + File.separator + "build";
     }
 
 }
